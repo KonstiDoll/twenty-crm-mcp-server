@@ -679,6 +679,556 @@ describe('TwentyCRMServer', () => {
     });
   });
 
+  describe('Opportunity Operations', () => {
+    describe('createOpportunity', () => {
+      it('should create an opportunity with required fields only', async () => {
+        const mockResponse = {
+          data: {
+            createOpportunity: {
+              id: 'opp-123',
+              name: 'Big Deal',
+              amount: null,
+              stage: null,
+              closeDate: null,
+              companyId: null,
+              company: null,
+              pointOfContactId: null,
+              pointOfContact: null,
+              createdAt: '2024-01-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.createOpportunity({
+          name: 'Big Deal'
+        });
+
+        expect(result.content[0].text).toContain('Created opportunity: Big Deal');
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      it('should create an opportunity with all fields', async () => {
+        const mockResponse = {
+          data: {
+            createOpportunity: {
+              id: 'opp-123',
+              name: 'Enterprise Deal',
+              amount: {
+                amountMicros: 250000000000,
+                currencyCode: 'USD'
+              },
+              stage: 'PROPOSAL',
+              closeDate: '2024-12-31',
+              companyId: 'comp-123',
+              company: {
+                id: 'comp-123',
+                name: 'Acme Corp'
+              },
+              pointOfContactId: 'person-123',
+              pointOfContact: {
+                id: 'person-123',
+                name: { firstName: 'John', lastName: 'Doe' }
+              },
+              createdAt: '2024-01-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.createOpportunity({
+          name: 'Enterprise Deal',
+          amount: 250000,
+          currency: 'USD',
+          stage: 'PROPOSAL',
+          closeDate: '2024-12-31',
+          companyId: 'comp-123',
+          pointOfContactId: 'person-123'
+        });
+
+        expect(result.content[0].text).toContain('Created opportunity: Enterprise Deal');
+        expect(result.content[0].text).toContain('250000000000');
+      });
+
+      it('should convert amount to micros correctly', async () => {
+        const mockResponse = {
+          data: {
+            createOpportunity: {
+              id: 'opp-123',
+              name: 'Medium Deal',
+              amount: {
+                amountMicros: 100000000000,
+                currencyCode: 'EUR'
+              },
+              stage: 'NEW',
+              closeDate: null,
+              companyId: null,
+              company: null,
+              pointOfContactId: null,
+              pointOfContact: null,
+              createdAt: '2024-01-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        await server.createOpportunity({
+          name: 'Medium Deal',
+          amount: 100000,
+          currency: 'EUR'
+        });
+
+        const callArgs = mockFetch.mock.calls[0][1];
+        const body = JSON.parse(callArgs.body as string);
+
+        expect(body.variables.input.amount.amountMicros).toBe(100000000000);
+        expect(body.variables.input.amount.currencyCode).toBe('EUR');
+      });
+
+      it('should use default currency when not specified', async () => {
+        const mockResponse = {
+          data: {
+            createOpportunity: {
+              id: 'opp-123',
+              name: 'Deal',
+              amount: {
+                amountMicros: 50000000000,
+                currencyCode: 'USD'
+              },
+              stage: null,
+              closeDate: null,
+              companyId: null,
+              company: null,
+              pointOfContactId: null,
+              pointOfContact: null,
+              createdAt: '2024-01-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        await server.createOpportunity({
+          name: 'Deal',
+          amount: 50000
+        });
+
+        const callArgs = mockFetch.mock.calls[0][1];
+        const body = JSON.parse(callArgs.body as string);
+
+        expect(body.variables.input.amount.currencyCode).toBe('USD');
+      });
+    });
+
+    describe('getOpportunity', () => {
+      it('should retrieve an opportunity by ID', async () => {
+        const mockResponse = {
+          data: {
+            opportunity: {
+              id: 'opp-123',
+              name: 'Big Deal',
+              amount: {
+                amountMicros: 500000000000,
+                currencyCode: 'USD'
+              },
+              stage: 'MEETING',
+              closeDate: '2024-06-30',
+              companyId: 'comp-123',
+              company: {
+                id: 'comp-123',
+                name: 'Acme Corp'
+              },
+              pointOfContactId: 'person-123',
+              pointOfContact: {
+                id: 'person-123',
+                name: { firstName: 'John', lastName: 'Doe' }
+              },
+              createdAt: '2024-01-01T00:00:00Z',
+              updatedAt: '2024-01-15T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.getOpportunity('opp-123');
+
+        expect(result.content[0].text).toContain('Opportunity details:');
+        expect(result.content[0].text).toContain('Big Deal');
+        expect(result.content[0].text).toContain('MEETING');
+      });
+    });
+
+    describe('listOpportunities', () => {
+      it('should list opportunities without filters', async () => {
+        const mockResponse = {
+          data: {
+            opportunities: {
+              edges: [
+                {
+                  node: {
+                    id: 'opp-123',
+                    name: 'Deal 1',
+                    amount: {
+                      amountMicros: 100000000000,
+                      currencyCode: 'USD'
+                    },
+                    stage: 'NEW',
+                    closeDate: '2024-12-31',
+                    companyId: 'comp-123',
+                    company: {
+                      id: 'comp-123',
+                      name: 'Acme Corp'
+                    },
+                    pointOfContactId: null,
+                    pointOfContact: null
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listOpportunities({});
+
+        expect(result.content[0].text).toContain('Found 1 opportunities');
+      });
+
+      it('should list opportunities with search term', async () => {
+        const mockResponse = {
+          data: {
+            opportunities: {
+              edges: [
+                {
+                  node: {
+                    id: 'opp-123',
+                    name: 'Enterprise Deal',
+                    amount: null,
+                    stage: 'PROPOSAL',
+                    closeDate: null,
+                    companyId: null,
+                    company: null,
+                    pointOfContactId: null,
+                    pointOfContact: null
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listOpportunities({ searchTerm: 'Enterprise' });
+
+        expect(result.content[0].text).toContain('Found 1 opportunities');
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      it('should list opportunities filtered by company', async () => {
+        const mockResponse = {
+          data: {
+            opportunities: {
+              edges: [
+                {
+                  node: {
+                    id: 'opp-123',
+                    name: 'Deal 1',
+                    amount: null,
+                    stage: 'NEW',
+                    closeDate: null,
+                    companyId: 'comp-123',
+                    company: {
+                      id: 'comp-123',
+                      name: 'Acme Corp'
+                    },
+                    pointOfContactId: null,
+                    pointOfContact: null
+                  }
+                },
+                {
+                  node: {
+                    id: 'opp-124',
+                    name: 'Deal 2',
+                    amount: null,
+                    stage: 'SCREENING',
+                    closeDate: null,
+                    companyId: 'comp-123',
+                    company: {
+                      id: 'comp-123',
+                      name: 'Acme Corp'
+                    },
+                    pointOfContactId: null,
+                    pointOfContact: null
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listOpportunities({ companyId: 'comp-123' });
+
+        expect(result.content[0].text).toContain('Found 2 opportunities');
+      });
+
+      it('should list opportunities filtered by stage', async () => {
+        const mockResponse = {
+          data: {
+            opportunities: {
+              edges: [
+                {
+                  node: {
+                    id: 'opp-125',
+                    name: 'Hot Deal',
+                    amount: {
+                      amountMicros: 1000000000000,
+                      currencyCode: 'USD'
+                    },
+                    stage: 'PROPOSAL',
+                    closeDate: '2024-03-31',
+                    companyId: 'comp-456',
+                    company: {
+                      id: 'comp-456',
+                      name: 'TechCo'
+                    },
+                    pointOfContactId: null,
+                    pointOfContact: null
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listOpportunities({ stage: 'PROPOSAL' });
+
+        expect(result.content[0].text).toContain('Found 1 opportunities');
+        expect(result.content[0].text).toContain('PROPOSAL');
+      });
+
+      it('should indicate when more results are available', async () => {
+        const mockResponse = {
+          data: {
+            opportunities: {
+              edges: Array(20).fill({
+                node: {
+                  id: 'opp-123',
+                  name: 'Deal',
+                  amount: null,
+                  stage: 'NEW',
+                  closeDate: null,
+                  companyId: null,
+                  company: null,
+                  pointOfContactId: null,
+                  pointOfContact: null
+                }
+              }),
+              pageInfo: {
+                hasNextPage: true,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listOpportunities({ limit: 20 });
+
+        expect(result.content[0].text).toContain('(more available)');
+      });
+    });
+
+    describe('updateOpportunity', () => {
+      it('should update an opportunity with partial fields', async () => {
+        const mockResponse = {
+          data: {
+            updateOpportunity: {
+              id: 'opp-123',
+              name: 'Updated Deal Name',
+              amount: {
+                amountMicros: 300000000000,
+                currencyCode: 'USD'
+              },
+              stage: 'CUSTOMER',
+              closeDate: '2024-03-15',
+              companyId: 'comp-123',
+              pointOfContactId: 'person-456',
+              updatedAt: '2024-02-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.updateOpportunity({
+          id: 'opp-123',
+          name: 'Updated Deal Name',
+          stage: 'CUSTOMER'
+        });
+
+        expect(result.content[0].text).toContain('Updated opportunity');
+        expect(result.content[0].text).toContain('Updated Deal Name');
+      });
+
+      it('should update opportunity amount with currency conversion', async () => {
+        const mockResponse = {
+          data: {
+            updateOpportunity: {
+              id: 'opp-123',
+              name: 'Deal',
+              amount: {
+                amountMicros: 750000000000,
+                currencyCode: 'EUR'
+              },
+              stage: 'PROPOSAL',
+              closeDate: null,
+              companyId: null,
+              pointOfContactId: null,
+              updatedAt: '2024-02-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        await server.updateOpportunity({
+          id: 'opp-123',
+          amount: 750000,
+          currency: 'EUR'
+        });
+
+        const callArgs = mockFetch.mock.calls[0][1];
+        const body = JSON.parse(callArgs.body as string);
+
+        expect(body.variables.input.amount.amountMicros).toBe(750000000000);
+        expect(body.variables.input.amount.currencyCode).toBe('EUR');
+      });
+
+      it('should update opportunity stage only', async () => {
+        const mockResponse = {
+          data: {
+            updateOpportunity: {
+              id: 'opp-123',
+              name: 'Deal',
+              amount: null,
+              stage: 'MEETING',
+              closeDate: null,
+              companyId: null,
+              pointOfContactId: null,
+              updatedAt: '2024-02-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.updateOpportunity({
+          id: 'opp-123',
+          stage: 'MEETING'
+        });
+
+        expect(result.content[0].text).toContain('Updated opportunity');
+        expect(result.content[0].text).toContain('MEETING');
+      });
+
+      it('should update opportunity close date', async () => {
+        const mockResponse = {
+          data: {
+            updateOpportunity: {
+              id: 'opp-123',
+              name: 'Deal',
+              amount: null,
+              stage: 'PROPOSAL',
+              closeDate: '2024-12-31',
+              companyId: null,
+              pointOfContactId: null,
+              updatedAt: '2024-02-01T00:00:00Z'
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.updateOpportunity({
+          id: 'opp-123',
+          closeDate: '2024-12-31'
+        });
+
+        expect(result.content[0].text).toContain('Updated opportunity');
+        expect(result.content[0].text).toContain('2024-12-31');
+      });
+    });
+  });
+
   describe('Error Handling', () => {
     it('should handle tool errors gracefully', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
