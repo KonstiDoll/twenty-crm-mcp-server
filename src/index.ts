@@ -186,6 +186,64 @@ interface ListCompaniesParams {
   searchTerm?: string;
 }
 
+// Opportunity Types
+interface CreateOpportunityInput {
+  name: string;
+  amount?: number;
+  currency?: string;
+  stage?: string;
+  closeDate?: string;
+  companyId?: string;
+  pointOfContactId?: string;
+}
+
+interface UpdateOpportunityInput {
+  id: string;
+  name?: string;
+  amount?: number;
+  currency?: string;
+  stage?: string;
+  closeDate?: string;
+  companyId?: string;
+  pointOfContactId?: string;
+}
+
+interface OpportunityGraphQLInput {
+  name: string;
+  amount?: CurrencyComposite;
+  stage?: string;
+  closeDate?: string;
+  companyId?: string;
+  pointOfContactId?: string;
+}
+
+interface Opportunity {
+  id: string;
+  name: string;
+  amount?: CurrencyComposite;
+  stage?: string;
+  closeDate?: string;
+  companyId?: string;
+  company?: {
+    id: string;
+    name: string;
+  };
+  pointOfContactId?: string;
+  pointOfContact?: {
+    id: string;
+    name: NameComposite;
+  };
+  createdAt: string;
+  updatedAt?: string;
+}
+
+interface ListOpportunitiesParams {
+  limit?: number;
+  searchTerm?: string;
+  companyId?: string;
+  stage?: string;
+}
+
 // GraphQL Response Types
 interface GraphQLResponse<T> {
   data: T;
@@ -210,6 +268,18 @@ interface CompaniesEdge {
 
 interface CompaniesConnection {
   edges: CompaniesEdge[];
+  pageInfo: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+interface OpportunitiesEdge {
+  node: Opportunity;
+}
+
+interface OpportunitiesConnection {
+  edges: OpportunitiesEdge[];
   pageInfo: {
     hasNextPage: boolean;
     hasPreviousPage: boolean;
@@ -480,6 +550,98 @@ class TwentyCRMServer {
             },
             required: ["id"]
           }
+        },
+
+        // Opportunity Management
+        {
+          name: "create_opportunity",
+          description: "Create a new opportunity in Twenty CRM",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Opportunity name (required)" },
+              amount: {
+                type: "number",
+                description: "Deal amount (will be stored in micros)"
+              },
+              currency: {
+                type: "string",
+                description: "Currency code (e.g., 'EUR', 'USD')",
+                default: "USD"
+              },
+              stage: {
+                type: "string",
+                description: "Opportunity stage (e.g., 'NEW', 'SCREENING', 'MEETING', 'PROPOSAL', 'CUSTOMER')"
+              },
+              closeDate: {
+                type: "string",
+                description: "Expected close date (ISO 8601 format: YYYY-MM-DD)"
+              },
+              companyId: {
+                type: "string",
+                description: "Company ID to associate with"
+              },
+              pointOfContactId: {
+                type: "string",
+                description: "Person ID for point of contact"
+              }
+            },
+            required: ["name"]
+          }
+        },
+        {
+          name: "get_opportunity",
+          description: "Get details of a specific opportunity by ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Opportunity ID" }
+            },
+            required: ["id"]
+          }
+        },
+        {
+          name: "list_opportunities",
+          description: "List opportunities with optional filtering and pagination",
+          inputSchema: {
+            type: "object",
+            properties: {
+              limit: {
+                type: "number",
+                description: "Number of results to return (max: 60, default: 20)"
+              },
+              searchTerm: {
+                type: "string",
+                description: "Search by opportunity name"
+              },
+              companyId: {
+                type: "string",
+                description: "Filter by company ID"
+              },
+              stage: {
+                type: "string",
+                description: "Filter by stage"
+              }
+            }
+          }
+        },
+        {
+          name: "update_opportunity",
+          description: "Update an existing opportunity's information",
+          inputSchema: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Opportunity ID (required)" },
+              name: { type: "string", description: "Opportunity name" },
+              amount: { type: "number", description: "Deal amount" },
+              currency: { type: "string", description: "Currency code" },
+              stage: { type: "string", description: "Opportunity stage" },
+              closeDate: { type: "string", description: "Expected close date (ISO 8601)" },
+              companyId: { type: "string", description: "Company ID" },
+              pointOfContactId: { type: "string", description: "Point of contact person ID" }
+            },
+            required: ["id"]
+          }
         }
       ];
 
@@ -508,6 +670,15 @@ class TwentyCRMServer {
             return await this.listCompanies((args || {}) as unknown as ListCompaniesParams);
           case "update_company":
             return await this.updateCompany(args as unknown as UpdateCompanyInput);
+
+          case "create_opportunity":
+            return await this.createOpportunity(args as unknown as CreateOpportunityInput);
+          case "get_opportunity":
+            return await this.getOpportunity((args as unknown as { id: string }).id);
+          case "list_opportunities":
+            return await this.listOpportunities((args || {}) as unknown as ListOpportunitiesParams);
+          case "update_opportunity":
+            return await this.updateOpportunity(args as unknown as UpdateOpportunityInput);
 
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -1118,6 +1289,236 @@ class TwentyCRMServer {
         {
           type: "text",
           text: `✅ Updated company\n\n${JSON.stringify(result.updateCompany, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  // ====================
+  // OPPORTUNITY OPERATIONS
+  // ====================
+
+  async createOpportunity(data: CreateOpportunityInput): Promise<CallToolResult> {
+    const mutation = `
+      mutation CreateOpportunity($input: OpportunityCreateInput!) {
+        createOpportunity(data: $input) {
+          id
+          name
+          amount {
+            amountMicros
+            currencyCode
+          }
+          stage
+          closeDate
+          companyId
+          company {
+            id
+            name
+          }
+          pointOfContactId
+          pointOfContact {
+            id
+            name {
+              firstName
+              lastName
+            }
+          }
+          createdAt
+        }
+      }
+    `;
+
+    // Build the input object with correct nested structure
+    const input: OpportunityGraphQLInput = {
+      name: data.name
+    };
+
+    // Add amount if provided (convert to micros)
+    if (data.amount !== undefined) {
+      input.amount = {
+        amountMicros: data.amount * 1000000, // Convert to micros
+        currencyCode: data.currency || "USD"
+      };
+    }
+
+    // Add other simple fields
+    if (data.stage) input.stage = data.stage;
+    if (data.closeDate) input.closeDate = data.closeDate;
+    if (data.companyId) input.companyId = data.companyId;
+    if (data.pointOfContactId) input.pointOfContactId = data.pointOfContactId;
+
+    const result = await this.graphqlRequest<{ createOpportunity: Opportunity }>(mutation, { input });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Created opportunity: ${result.createOpportunity.name}\n\n${JSON.stringify(result.createOpportunity, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  async getOpportunity(id: string): Promise<CallToolResult> {
+    const query = `
+      query GetOpportunity($id: UUID!) {
+        opportunity(filter: { id: { eq: $id } }) {
+          id
+          name
+          amount {
+            amountMicros
+            currencyCode
+          }
+          stage
+          closeDate
+          companyId
+          company {
+            id
+            name
+          }
+          pointOfContactId
+          pointOfContact {
+            id
+            name {
+              firstName
+              lastName
+            }
+          }
+          createdAt
+          updatedAt
+        }
+      }
+    `;
+
+    const result = await this.graphqlRequest<{ opportunity: Opportunity }>(query, { id });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Opportunity details:\n\n${JSON.stringify(result.opportunity, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  async listOpportunities(params: ListOpportunitiesParams = {}): Promise<CallToolResult> {
+    const { limit = 20, searchTerm, companyId, stage } = params;
+
+    const query = `
+      query ListOpportunities($filter: OpportunityFilterInput, $limit: Int) {
+        opportunities(filter: $filter, first: $limit) {
+          edges {
+            node {
+              id
+              name
+              amount {
+                amountMicros
+                currencyCode
+              }
+              stage
+              closeDate
+              companyId
+              company {
+                id
+                name
+              }
+              pointOfContactId
+              pointOfContact {
+                id
+                name {
+                  firstName
+                  lastName
+                }
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            hasPreviousPage
+          }
+        }
+      }
+    `;
+
+    // Build filter
+    const filter: Record<string, unknown> = {};
+    if (searchTerm) {
+      filter.name = { ilike: `%${searchTerm}%` };
+    }
+    if (companyId) {
+      filter.companyId = { eq: companyId };
+    }
+    if (stage) {
+      filter.stage = { eq: stage };
+    }
+
+    const result = await this.graphqlRequest<{ opportunities: OpportunitiesConnection }>(query, {
+      filter: Object.keys(filter).length > 0 ? filter : null,
+      limit
+    });
+
+    const opportunities = result.opportunities.edges.map(edge => edge.node);
+    const summary = `Found ${opportunities.length} opportunities${result.opportunities.pageInfo.hasNextPage ? ' (more available)' : ''}`;
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `${summary}\n\n${JSON.stringify(opportunities, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  async updateOpportunity(data: UpdateOpportunityInput): Promise<CallToolResult> {
+    const { id, ...updates } = data;
+
+    const mutation = `
+      mutation UpdateOpportunity($id: UUID!, $input: OpportunityUpdateInput!) {
+        updateOpportunity(id: $id, data: $input) {
+          id
+          name
+          amount {
+            amountMicros
+            currencyCode
+          }
+          stage
+          closeDate
+          companyId
+          pointOfContactId
+          updatedAt
+        }
+      }
+    `;
+
+    // Build the input object with correct nested structure
+    const input: Partial<OpportunityGraphQLInput> = {};
+
+    // Update name if provided
+    if (updates.name !== undefined) input.name = updates.name;
+
+    // Update amount if provided
+    if (updates.amount !== undefined) {
+      input.amount = {
+        amountMicros: updates.amount * 1000000,
+        currencyCode: updates.currency || "USD"
+      };
+    }
+
+    // Add other simple fields
+    if (updates.stage !== undefined) input.stage = updates.stage;
+    if (updates.closeDate !== undefined) input.closeDate = updates.closeDate;
+    if (updates.companyId !== undefined) input.companyId = updates.companyId;
+    if (updates.pointOfContactId !== undefined) input.pointOfContactId = updates.pointOfContactId;
+
+    const result = await this.graphqlRequest<{ updateOpportunity: Opportunity }>(mutation, { id, input });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Updated opportunity\n\n${JSON.stringify(result.updateOpportunity, null, 2)}`
         }
       ]
     };
