@@ -122,6 +122,13 @@ import {
   ListAttachmentsParams,
 } from "./domains/attachment/index.js";
 
+import {
+  WORKSPACE_MEMBER_TOOLS,
+  getWorkspaceMember,
+  listWorkspaceMembers,
+  ListWorkspaceMembersParams,
+} from "./domains/workspaceMember/index.js";
+
 /**
  * Main Twenty CRM MCP Server
  */
@@ -172,6 +179,7 @@ class TwentyCRMServer {
           ...ACTIVITY_TOOLS,
           ...FAVORITE_TOOLS,
           ...ATTACHMENT_TOOLS,
+          ...WORKSPACE_MEMBER_TOOLS,
         ],
       };
     });
@@ -398,6 +406,18 @@ class TwentyCRMServer {
               (args as unknown as { id: string }).id
             );
 
+          // Workspace Member operations
+          case "list_workspace_members":
+            return await listWorkspaceMembers(
+              this.client,
+              (args || {}) as unknown as ListWorkspaceMembersParams
+            );
+          case "get_workspace_member":
+            return await getWorkspaceMember(
+              this.client,
+              (args as unknown as { id: string }).id
+            );
+
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -585,6 +605,14 @@ class TwentyCRMServer {
 
   async deleteAttachment(id: string) {
     return deleteAttachment(this.client, id);
+  }
+
+  async listWorkspaceMembers(params: ListWorkspaceMembersParams = {}) {
+    return listWorkspaceMembers(this.client, params);
+  }
+
+  async getWorkspaceMember(id: string) {
+    return getWorkspaceMember(this.client, id);
   }
 }
 

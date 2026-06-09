@@ -3052,4 +3052,148 @@ describe('TwentyCRMServer', () => {
       process.env.TWENTY_API_KEY = 'test-api-key';
     });
   });
+
+  describe('Workspace Member Operations', () => {
+    describe('listWorkspaceMembers', () => {
+      it('should list all workspace members', async () => {
+        const mockResponse = {
+          data: {
+            workspaceMembers: {
+              edges: [
+                {
+                  node: {
+                    id: 'member-123',
+                    name: { firstName: 'Alice', lastName: 'Smith' },
+                    userEmail: 'alice@example.com',
+                    avatarUrl: null,
+                    locale: 'en',
+                    colorScheme: 'Light',
+                    createdAt: '2024-01-01T00:00:00Z',
+                    updatedAt: null
+                  }
+                },
+                {
+                  node: {
+                    id: 'member-456',
+                    name: { firstName: 'Bob', lastName: 'Jones' },
+                    userEmail: 'bob@example.com',
+                    avatarUrl: null,
+                    locale: 'en',
+                    colorScheme: 'Dark',
+                    createdAt: '2024-01-02T00:00:00Z',
+                    updatedAt: null
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listWorkspaceMembers();
+
+        expect(result.content[0].text).toContain('Found 2 workspace member');
+        expect(result.content[0].text).toContain('alice@example.com');
+        expect(result.content[0].text).toContain('bob@example.com');
+      });
+
+      it('should list workspace members with search filter', async () => {
+        const mockResponse = {
+          data: {
+            workspaceMembers: {
+              edges: [
+                {
+                  node: {
+                    id: 'member-123',
+                    name: { firstName: 'Alice', lastName: 'Smith' },
+                    userEmail: 'alice@example.com',
+                    avatarUrl: null,
+                    locale: 'en',
+                    colorScheme: 'Light',
+                    createdAt: '2024-01-01T00:00:00Z',
+                    updatedAt: null
+                  }
+                }
+              ],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listWorkspaceMembers({ searchTerm: 'Alice' });
+
+        expect(result.content[0].text).toContain('Found 1 workspace member');
+        expect(result.content[0].text).toContain('Alice');
+      });
+
+      it('should return empty list when no members found', async () => {
+        const mockResponse = {
+          data: {
+            workspaceMembers: {
+              edges: [],
+              pageInfo: {
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.listWorkspaceMembers();
+
+        expect(result.content[0].text).toContain('Found 0 workspace member');
+      });
+    });
+
+    describe('getWorkspaceMember', () => {
+      it('should get a workspace member by ID', async () => {
+        const mockResponse = {
+          data: {
+            workspaceMember: {
+              id: 'member-123',
+              name: { firstName: 'Alice', lastName: 'Smith' },
+              userEmail: 'alice@example.com',
+              avatarUrl: null,
+              locale: 'en',
+              colorScheme: 'Light',
+              createdAt: '2024-01-01T00:00:00Z',
+              updatedAt: null
+            }
+          }
+        };
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse
+        });
+
+        const result = await server.getWorkspaceMember('member-123');
+
+        expect(result.content[0].text).toContain('Workspace member details');
+        expect(result.content[0].text).toContain('alice@example.com');
+        expect(result.content[0].text).toContain('Alice');
+      });
+    });
+  });
 });
