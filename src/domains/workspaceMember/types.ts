@@ -27,19 +27,3 @@ export interface WorkspaceMember {
   createdAt: string;
   updatedAt?: string;
 }
-
-// ======================
-// GRAPHQL RESPONSE TYPES
-// ======================
-
-export interface WorkspaceMemberEdge {
-  node: WorkspaceMember;
-}
-
-export interface WorkspaceMemberConnection {
-  edges: WorkspaceMemberEdge[];
-  pageInfo: {
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
-}
