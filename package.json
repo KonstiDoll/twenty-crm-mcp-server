@@ -20,7 +20,8 @@
     "type-check": "tsc --noEmit",
     "prebuild": "rm -rf dist",
     "prestart": "npm run build",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "smoke:live": "node scripts/smoke-live.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0"
