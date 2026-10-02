@@ -32,7 +32,7 @@ export const FAVORITE_TOOLS: Tool[] = [
   },
   {
     name: "get_favorite",
-    description: "Get details of a specific favorite by ID",
+    description: "Get details of a specific favorite (navigation menu item) by ID",
     inputSchema: {
       type: "object",
       properties: {
@@ -66,9 +66,10 @@ export const FAVORITE_TOOLS: Tool[] = [
           type: "string",
           description: "Filter by opportunity ID",
         },
-        forWorkspaceMemberId: {
+        objectType: {
           type: "string",
-          description: "Filter by workspace member ID",
+          description:
+            "Filter by object type of the favorited record (e.g. person, company, opportunity)",
         },
       },
     },

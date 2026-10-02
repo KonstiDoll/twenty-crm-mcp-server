@@ -1,5 +1,8 @@
 /**
  * Favorite domain type definitions
+ *
+ * Twenty v2 models favorites as navigation menu items (type RECORD) that
+ * point at a record via targetRecordId + targetObjectMetadataId.
  */
 
 import { Favorite } from "../../shared/types.js";
@@ -20,34 +23,41 @@ export interface ListFavoritesParams {
   personId?: string;
   companyId?: string;
   opportunityId?: string;
-  forWorkspaceMemberId?: string;
+  /** Restrict to one object type, e.g. "person", "company", "opportunity" */
+  objectType?: string;
 }
 
 // ======================
-// GRAPHQL INPUT TYPES
+// GRAPHQL TYPES
 // ======================
 
-export interface FavoriteGraphQLInput {
-  personId?: string;
-  companyId?: string;
-  opportunityId?: string;
+export interface NavigationMenuItemInput {
+  type: "RECORD";
+  targetRecordId: string;
+  targetObjectMetadataId: string;
   position?: number;
 }
 
-// ======================
-// GRAPHQL RESPONSE TYPES
-// ======================
-
-export interface FavoritesEdge {
-  node: Favorite;
+export interface NavigationMenuItem {
+  id: string;
+  type: string;
+  name?: string | null;
+  position: number;
+  targetRecordId?: string | null;
+  targetObjectMetadataId?: string | null;
+  userWorkspaceId?: string | null;
+  folderId?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  targetRecordIdentifier?: {
+    id: string;
+    labelIdentifier?: string | null;
+  } | null;
 }
 
-export interface FavoritesConnection {
-  edges: FavoritesEdge[];
-  pageInfo: {
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
+export interface ObjectMetadataNode {
+  id: string;
+  nameSingular: string;
 }
 
 // Re-export shared type

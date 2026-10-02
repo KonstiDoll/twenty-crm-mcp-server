@@ -2330,206 +2330,167 @@ describe('TwentyCRMServer', () => {
   });
 
   describe('Favorite Operations', () => {
+    // Twenty v2: favorites are navigation menu items (type RECORD) on /metadata.
+    const objectsResponse = {
+      data: {
+        objects: {
+          edges: [
+            { node: { id: 'obj-person', nameSingular: 'person' } },
+            { node: { id: 'obj-company', nameSingular: 'company' } },
+            { node: { id: 'obj-opportunity', nameSingular: 'opportunity' } },
+          ],
+        },
+      },
+    };
+    const ok = (body: unknown) => ({ ok: true, json: async () => body });
+    const item = (overrides: Record<string, unknown>) => ({
+      id: 'fav-123',
+      type: 'RECORD',
+      name: null,
+      position: 0,
+      targetRecordId: 'person-123',
+      targetObjectMetadataId: 'obj-person',
+      userWorkspaceId: 'uw-1',
+      folderId: null,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+      targetRecordIdentifier: { id: 'person-123', labelIdentifier: 'Jane Doe' },
+      ...overrides,
+    });
+
     describe('addFavorite', () => {
       it('should add a person to favorites', async () => {
-        const mockResponse = {
-          data: {
-            createFavorite: {
-              id: 'fav-123',
-              position: 1,
-              personId: 'person-123',
-              companyId: null,
-              opportunityId: null,
-              workspaceMemberId: 'user-123',
-              createdAt: '2024-01-01T00:00:00Z',
-              updatedAt: null
-            }
-          }
-        };
+        mockFetch
+          .mockResolvedValueOnce(ok(objectsResponse))
+          .mockResolvedValueOnce(ok({ data: { createNavigationMenuItem: item({}) } }));
 
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
-
-        const result = await server.addFavorite({
-          personId: 'person-123'
-        });
+        const result = await server.addFavorite({ personId: 'person-123' });
 
         expect(result.content[0].text).toContain('Added person to favorites');
         expect(result.content[0].text).toContain('person-123');
+        expect(result.content[0].text).toContain('"objectType": "person"');
+        // Both calls go to the metadata endpoint
+        expect(mockFetch.mock.calls[0][0]).toBe('https://test.twenty.com/metadata');
+        expect(mockFetch.mock.calls[1][0]).toBe('https://test.twenty.com/metadata');
+        const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+        expect(body.variables.input).toEqual({
+          type: 'RECORD',
+          targetRecordId: 'person-123',
+          targetObjectMetadataId: 'obj-person',
+        });
       });
 
       it('should add a company to favorites with position', async () => {
-        const mockResponse = {
-          data: {
-            createFavorite: {
-              id: 'fav-124',
-              position: 5,
-              personId: null,
-              companyId: 'company-123',
-              opportunityId: null,
-              workspaceMemberId: 'user-123',
-              createdAt: '2024-01-01T00:00:00Z',
-              updatedAt: null
-            }
-          }
-        };
+        mockFetch
+          .mockResolvedValueOnce(ok(objectsResponse))
+          .mockResolvedValueOnce(
+            ok({
+              data: {
+                createNavigationMenuItem: item({
+                  id: 'fav-456',
+                  position: 5,
+                  targetRecordId: 'company-456',
+                  targetObjectMetadataId: 'obj-company',
+                  targetRecordIdentifier: { id: 'company-456', labelIdentifier: 'Acme' },
+                }),
+              },
+            })
+          );
 
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
-
-        const result = await server.addFavorite({
-          companyId: 'company-123',
-          position: 5
-        });
+        const result = await server.addFavorite({ companyId: 'company-456', position: 5 });
 
         expect(result.content[0].text).toContain('Added company to favorites');
+        expect(result.content[0].text).toContain('"companyId": "company-456"');
+        const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+        expect(body.variables.input.position).toBe(5);
       });
 
       it('should throw error when no target is provided', async () => {
-        await expect(
-          server.addFavorite({})
-        ).rejects.toThrow('At least one target');
+        await expect(server.addFavorite({})).rejects.toThrow(
+          'At least one target (personId, companyId, or opportunityId) must be provided'
+        );
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it('should throw when the object type is missing from workspace metadata', async () => {
+        mockFetch.mockResolvedValueOnce(ok({ data: { objects: { edges: [] } } }));
+        await expect(server.addFavorite({ personId: 'person-123' })).rejects.toThrow(
+          'Object "person" not found'
+        );
       });
     });
 
     describe('getFavorite', () => {
       it('should get a favorite by ID', async () => {
-        const mockResponse = {
-          data: {
-            favorite: {
-              id: 'fav-123',
-              position: 1,
-              personId: 'person-123',
-              companyId: null,
-              opportunityId: null,
-              workspaceMemberId: 'user-123',
-              createdAt: '2024-01-01T00:00:00Z',
-              updatedAt: null
-            }
-          }
-        };
-
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
+        mockFetch
+          .mockResolvedValueOnce(ok(objectsResponse))
+          .mockResolvedValueOnce(ok({ data: { navigationMenuItem: item({}) } }));
 
         const result = await server.getFavorite('fav-123');
 
         expect(result.content[0].text).toContain('Favorite details');
         expect(result.content[0].text).toContain('person-123');
+        expect(result.content[0].text).toContain('"label": "Jane Doe"');
       });
     });
 
     describe('listFavorites', () => {
-      it('should list all favorites', async () => {
-        const mockResponse = {
-          data: {
-            favorites: {
-              edges: [
-                {
-                  node: {
-                    id: 'fav-123',
-                    position: 1,
-                    personId: 'person-123',
-                    companyId: null,
-                    opportunityId: null,
-                    workspaceMemberId: 'user-123',
-                    createdAt: '2024-01-01T00:00:00Z',
-                    updatedAt: null
-                  }
-                },
-                {
-                  node: {
-                    id: 'fav-124',
-                    position: 2,
-                    personId: null,
-                    companyId: 'company-123',
-                    opportunityId: null,
-                    workspaceMemberId: 'user-123',
-                    createdAt: '2024-01-02T00:00:00Z',
-                    updatedAt: null
-                  }
-                }
-              ],
-              pageInfo: {
-                hasNextPage: false,
-                hasPreviousPage: false
-              }
-            }
-          }
-        };
+      const listResponse = {
+        data: {
+          navigationMenuItems: [
+            item({ id: 'view-1', type: 'VIEW', targetRecordId: null, targetObjectMetadataId: null }),
+            item({ id: 'fav-2', position: 2, targetRecordId: 'company-456', targetObjectMetadataId: 'obj-company' }),
+            item({ id: 'fav-1', position: 1 }),
+          ],
+        },
+      };
 
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
+      it('should list all record favorites sorted by position', async () => {
+        mockFetch
+          .mockResolvedValueOnce(ok(objectsResponse))
+          .mockResolvedValueOnce(ok(listResponse));
 
         const result = await server.listFavorites();
 
         expect(result.content[0].text).toContain('Found 2 favorite');
+        expect(result.content[0].text).not.toContain('view-1');
+        expect(result.content[0].text.indexOf('fav-1')).toBeLessThan(
+          result.content[0].text.indexOf('fav-2')
+        );
       });
 
       it('should list favorites filtered by company', async () => {
-        const mockResponse = {
-          data: {
-            favorites: {
-              edges: [
-                {
-                  node: {
-                    id: 'fav-125',
-                    position: 3,
-                    personId: null,
-                    companyId: 'company-123',
-                    opportunityId: null,
-                    workspaceMemberId: 'user-123',
-                    createdAt: '2024-01-03T00:00:00Z',
-                    updatedAt: null
-                  }
-                }
-              ],
-              pageInfo: {
-                hasNextPage: false,
-                hasPreviousPage: false
-              }
-            }
-          }
-        };
+        mockFetch
+          .mockResolvedValueOnce(ok(objectsResponse))
+          .mockResolvedValueOnce(ok(listResponse));
 
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
-
-        const result = await server.listFavorites({ companyId: 'company-123' });
+        const result = await server.listFavorites({ companyId: 'company-456' });
 
         expect(result.content[0].text).toContain('Found 1 favorite');
+        expect(result.content[0].text).toContain('fav-2');
+        expect(result.content[0].text).not.toContain('fav-1');
+      });
+
+      it('should honour limit and report more available', async () => {
+        mockFetch
+          .mockResolvedValueOnce(ok(objectsResponse))
+          .mockResolvedValueOnce(ok(listResponse));
+
+        const result = await server.listFavorites({ limit: 1 });
+
+        expect(result.content[0].text).toContain('Found 1 favorite(s) (more available)');
       });
     });
 
     describe('removeFavorite', () => {
       it('should remove a favorite', async () => {
-        const mockResponse = {
-          data: {
-            deleteFavorite: {
-              id: 'fav-123'
-            }
-          }
-        };
-
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockResponse
-        });
+        mockFetch.mockResolvedValueOnce(ok({ data: { deleteNavigationMenuItem: { id: 'fav-123' } } }));
 
         const result = await server.removeFavorite('fav-123');
 
         expect(result.content[0].text).toContain('Removed favorite');
         expect(result.content[0].text).toContain('fav-123');
+        expect(mockFetch.mock.calls[0][0]).toBe('https://test.twenty.com/metadata');
       });
     });
   });

@@ -121,14 +121,21 @@ export interface TimelineActivity {
   updatedAt?: string;
 }
 
-// Favorite - Quick access to frequently used records
+// Favorite - Quick access to frequently used records.
+// Backed by navigation menu items (type RECORD) since Twenty v2.
 export interface Favorite {
   id: string;
   position: number;
+  /** Object type of the favorited record, e.g. "person", "company" */
+  objectType: string;
+  /** ID of the favorited record */
+  targetRecordId: string;
+  /** Display label of the favorited record, when known */
+  label?: string | null;
   personId?: string;
   companyId?: string;
   opportunityId?: string;
-  forWorkspaceMemberId?: string;
+  userWorkspaceId?: string | null;
   createdAt: string;
   updatedAt?: string;
 }

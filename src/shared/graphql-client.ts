@@ -9,13 +9,22 @@ export interface GraphQLClientConfig {
   baseUrl: string;
 }
 
+/**
+ * Twenty exposes two GraphQL endpoints: /graphql for workspace records
+ * (people, companies, ...) and /metadata for workspace configuration
+ * (objects, fields, navigation menu items, ...).
+ */
+export type GraphQLEndpoint = "graphql" | "metadata";
+
 export class GraphQLClient {
   private apiKey: string;
   private graphqlEndpoint: string;
+  private metadataEndpoint: string;
 
   constructor(config: GraphQLClientConfig) {
     this.apiKey = config.apiKey;
     this.graphqlEndpoint = `${config.baseUrl}/graphql`;
+    this.metadataEndpoint = `${config.baseUrl}/metadata`;
 
     if (!this.apiKey) {
       throw new Error("API key is required for GraphQL client");
@@ -27,9 +36,12 @@ export class GraphQLClient {
    */
   async request<T>(
     query: string,
-    variables: Record<string, unknown> = {}
+    variables: Record<string, unknown> = {},
+    endpoint: GraphQLEndpoint = "graphql"
   ): Promise<T> {
-    const response = await fetch(this.graphqlEndpoint, {
+    const url =
+      endpoint === "metadata" ? this.metadataEndpoint : this.graphqlEndpoint;
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
