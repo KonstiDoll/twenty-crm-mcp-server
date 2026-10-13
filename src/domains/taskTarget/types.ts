@@ -29,9 +29,9 @@ export interface ListTaskTargetsParams {
 
 export interface TaskTargetGraphQLInput {
   taskId: string;
-  personId?: string;
-  companyId?: string;
-  opportunityId?: string;
+  targetPersonId?: string;
+  targetCompanyId?: string;
+  targetOpportunityId?: string;
 }
 
 // ======================

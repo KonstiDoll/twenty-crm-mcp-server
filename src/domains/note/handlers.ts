@@ -7,6 +7,7 @@ import { createCRUDHandlers } from "../../shared/base-handler.js";
 import { GraphQLClient } from "../../shared/graphql-client.js";
 import { transformBodyV2 } from "../../shared/transformers.js";
 import { CREATE_NOTE_TARGET_MUTATION } from "../noteTarget/queries.js";
+import { toTargetFields } from "../../shared/targets.js";
 import {
   CREATE_NOTE_MUTATION,
   GET_NOTE_QUERY,
@@ -120,7 +121,9 @@ export async function createNote(
 
       const linked: string[] = [];
       for (const target of targets) {
-        await client.request(CREATE_NOTE_TARGET_MUTATION, { input: target });
+        await client.request(CREATE_NOTE_TARGET_MUTATION, {
+          input: { noteId: target.noteId, ...toTargetFields(target) },
+        });
         if (target.personId) linked.push(`person (${target.personId})`);
         if (target.companyId) linked.push(`company (${target.companyId})`);
         if (target.opportunityId) linked.push(`opportunity (${target.opportunityId})`);

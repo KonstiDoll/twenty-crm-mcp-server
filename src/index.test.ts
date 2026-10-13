@@ -1695,9 +1695,9 @@ describe('TwentyCRMServer', () => {
             createTaskTarget: {
               id: 'target-123',
               taskId: 'task-123',
-              personId: 'person-123',
-              companyId: null,
-              opportunityId: null,
+              targetPersonId: 'person-123',
+              targetCompanyId: null,
+              targetOpportunityId: null,
               createdAt: '2024-01-01T00:00:00Z',
               updatedAt: null
             }
@@ -1724,9 +1724,9 @@ describe('TwentyCRMServer', () => {
             createTaskTarget: {
               id: 'target-124',
               taskId: 'task-123',
-              personId: null,
-              companyId: 'company-123',
-              opportunityId: null,
+              targetPersonId: null,
+              targetCompanyId: 'company-123',
+              targetOpportunityId: null,
               createdAt: '2024-01-01T00:00:00Z',
               updatedAt: null
             }
@@ -1765,9 +1765,9 @@ describe('TwentyCRMServer', () => {
                   node: {
                     id: 'target-123',
                     taskId: 'task-123',
-                    personId: 'person-123',
-                    companyId: null,
-                    opportunityId: null,
+                    targetPersonId: 'person-123',
+                    targetCompanyId: null,
+                    targetOpportunityId: null,
                     createdAt: '2024-01-01T00:00:00Z',
                     updatedAt: null
                   }
@@ -1823,9 +1823,9 @@ describe('TwentyCRMServer', () => {
             createNoteTarget: {
               id: 'target-125',
               noteId: 'note-123',
-              personId: 'person-123',
-              companyId: null,
-              opportunityId: null,
+              targetPersonId: 'person-123',
+              targetCompanyId: null,
+              targetOpportunityId: null,
               createdAt: '2024-01-01T00:00:00Z',
               updatedAt: null
             }
@@ -1852,9 +1852,9 @@ describe('TwentyCRMServer', () => {
             createNoteTarget: {
               id: 'target-126',
               noteId: 'note-123',
-              personId: null,
-              companyId: null,
-              opportunityId: 'opp-123',
+              targetPersonId: null,
+              targetCompanyId: null,
+              targetOpportunityId: 'opp-123',
               createdAt: '2024-01-01T00:00:00Z',
               updatedAt: null
             }
@@ -1893,9 +1893,9 @@ describe('TwentyCRMServer', () => {
                   node: {
                     id: 'target-127',
                     noteId: 'note-123',
-                    personId: null,
-                    companyId: 'company-123',
-                    opportunityId: null,
+                    targetPersonId: null,
+                    targetCompanyId: 'company-123',
+                    targetOpportunityId: null,
                     createdAt: '2024-01-01T00:00:00Z',
                     updatedAt: null
                   }
@@ -1904,9 +1904,9 @@ describe('TwentyCRMServer', () => {
                   node: {
                     id: 'target-128',
                     noteId: 'note-124',
-                    personId: null,
-                    companyId: 'company-123',
-                    opportunityId: null,
+                    targetPersonId: null,
+                    targetCompanyId: 'company-123',
+                    targetOpportunityId: null,
                     createdAt: '2024-01-02T00:00:00Z',
                     updatedAt: null
                   }
@@ -1951,6 +1951,94 @@ describe('TwentyCRMServer', () => {
         expect(result.content[0].text).toContain('Deleted note target');
         expect(result.content[0].text).toContain('target-129');
       });
+    });
+  });
+
+  describe('Target field mapping (Twenty v2 targetXxxId)', () => {
+    const sentBody = (call: number) =>
+      JSON.parse(mockFetch.mock.calls[call][1].body as string);
+
+    const okResponse = (data: unknown) => ({ ok: true, json: async () => ({ data }) });
+
+    it('createNoteTarget sends targetPersonId and maps the response back', async () => {
+      mockFetch.mockResolvedValueOnce(okResponse({
+        createNoteTarget: { id: 't-1', noteId: 'note-1', targetPersonId: 'person-1', targetCompanyId: null, targetOpportunityId: null, createdAt: '2024-01-01T00:00:00Z' }
+      }));
+
+      const result = await server.createNoteTarget({ noteId: 'note-1', personId: 'person-1' });
+
+      const body = sentBody(0);
+      expect(body.variables.input).toEqual({ noteId: 'note-1', targetPersonId: 'person-1' });
+      expect(body.query).toContain('targetPersonId');
+      expect(body.query).not.toMatch(/^\s*personId\s*$/m);
+      expect(result.content[0].text).toContain('Linked note to person (person-1)');
+      expect(result.content[0].text).toContain('"personId": "person-1"');
+      expect(result.content[0].text).not.toContain('targetPersonId');
+    });
+
+    it('listNoteTargets filters on targetPersonId / targetCompanyId', async () => {
+      mockFetch.mockResolvedValueOnce(okResponse({
+        noteTargets: { edges: [], pageInfo: { hasNextPage: false, hasPreviousPage: false } }
+      }));
+
+      await server.listNoteTargets({ personId: 'person-1', companyId: 'company-1', noteId: 'note-1' });
+
+      expect(sentBody(0).variables.filter).toEqual({
+        targetPersonId: { eq: 'person-1' },
+        targetCompanyId: { eq: 'company-1' },
+        noteId: { eq: 'note-1' }
+      });
+    });
+
+    it('createTaskTarget sends targetOpportunityId', async () => {
+      mockFetch.mockResolvedValueOnce(okResponse({
+        createTaskTarget: { id: 't-2', taskId: 'task-1', targetPersonId: null, targetCompanyId: null, targetOpportunityId: 'opp-1', createdAt: '2024-01-01T00:00:00Z' }
+      }));
+
+      const result = await server.createTaskTarget({ taskId: 'task-1', opportunityId: 'opp-1' });
+
+      expect(sentBody(0).variables.input).toEqual({ taskId: 'task-1', targetOpportunityId: 'opp-1' });
+      expect(result.content[0].text).toContain('Linked task to opportunity (opp-1)');
+    });
+
+    it('listTaskTargets filters on targetCompanyId', async () => {
+      mockFetch.mockResolvedValueOnce(okResponse({
+        taskTargets: { edges: [], pageInfo: { hasNextPage: false, hasPreviousPage: false } }
+      }));
+
+      await server.listTaskTargets({ companyId: 'company-1' });
+
+      expect(sentBody(0).variables.filter).toEqual({ targetCompanyId: { eq: 'company-1' } });
+    });
+
+    it('createNote auto-links with targetPersonId', async () => {
+      mockFetch
+        .mockResolvedValueOnce(okResponse({
+          createNote: { id: 'note-9', title: 'Linked note', createdAt: '2024-01-01T00:00:00Z' }
+        }))
+        .mockResolvedValueOnce(okResponse({
+          createNoteTarget: { id: 't-9', noteId: 'note-9', targetPersonId: 'person-9' }
+        }));
+
+      const result = await server.createNote({ title: 'Linked note', personId: 'person-9' });
+
+      expect(sentBody(1).variables.input).toEqual({ noteId: 'note-9', targetPersonId: 'person-9' });
+      expect(result.content[0].text).toContain('Auto-linked to: person (person-9)');
+    });
+
+    it('createTask auto-links with targetCompanyId', async () => {
+      mockFetch
+        .mockResolvedValueOnce(okResponse({
+          createTask: { id: 'task-9', title: 'Linked task', createdAt: '2024-01-01T00:00:00Z' }
+        }))
+        .mockResolvedValueOnce(okResponse({
+          createTaskTarget: { id: 't-10', taskId: 'task-9', targetCompanyId: 'company-9' }
+        }));
+
+      const result = await server.createTask({ title: 'Linked task', companyId: 'company-9' });
+
+      expect(sentBody(1).variables.input).toEqual({ taskId: 'task-9', targetCompanyId: 'company-9' });
+      expect(result.content[0].text).toContain('Auto-linked to: company (company-9)');
     });
   });
 

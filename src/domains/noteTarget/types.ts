@@ -29,9 +29,9 @@ export interface ListNoteTargetsParams {
 
 export interface NoteTargetGraphQLInput {
   noteId: string;
-  personId?: string;
-  companyId?: string;
-  opportunityId?: string;
+  targetPersonId?: string;
+  targetCompanyId?: string;
+  targetOpportunityId?: string;
 }
 
 // ======================

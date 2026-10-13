@@ -7,9 +7,9 @@ export const CREATE_TASK_TARGET_MUTATION = `
     createTaskTarget(data: $input) {
       id
       taskId
-      personId
-      companyId
-      opportunityId
+      targetPersonId
+      targetCompanyId
+      targetOpportunityId
       createdAt
       updatedAt
     }
@@ -23,9 +23,9 @@ export const LIST_TASK_TARGETS_QUERY = `
         node {
           id
           taskId
-          personId
-          companyId
-          opportunityId
+          targetPersonId
+          targetCompanyId
+          targetOpportunityId
           createdAt
           updatedAt
         }
