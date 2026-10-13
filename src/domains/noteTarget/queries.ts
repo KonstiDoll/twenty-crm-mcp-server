@@ -7,9 +7,9 @@ export const CREATE_NOTE_TARGET_MUTATION = `
     createNoteTarget(data: $input) {
       id
       noteId
-      personId
-      companyId
-      opportunityId
+      targetPersonId
+      targetCompanyId
+      targetOpportunityId
       createdAt
       updatedAt
     }
@@ -23,9 +23,9 @@ export const LIST_NOTE_TARGETS_QUERY = `
         node {
           id
           noteId
-          personId
-          companyId
-          opportunityId
+          targetPersonId
+          targetCompanyId
+          targetOpportunityId
           createdAt
           updatedAt
         }

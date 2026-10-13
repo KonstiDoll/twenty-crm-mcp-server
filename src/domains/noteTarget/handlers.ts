@@ -6,6 +6,11 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { GraphQLClient } from "../../shared/graphql-client.js";
 import { Connection } from "../../shared/types.js";
 import {
+  fromTargetFields,
+  toTargetFields,
+  toTargetFilter,
+} from "../../shared/targets.js";
+import {
   CREATE_NOTE_TARGET_MUTATION,
   LIST_NOTE_TARGETS_QUERY,
   DELETE_NOTE_TARGET_MUTATION,
@@ -23,15 +28,10 @@ import {
 function transformCreateInput(
   data: CreateNoteTargetInput
 ): NoteTargetGraphQLInput {
-  const input: NoteTargetGraphQLInput = {
+  return {
     noteId: data.noteId,
+    ...toTargetFields(data),
   };
-
-  if (data.personId) input.personId = data.personId;
-  if (data.companyId) input.companyId = data.companyId;
-  if (data.opportunityId) input.opportunityId = data.opportunityId;
-
-  return input;
 }
 
 /**
@@ -41,12 +41,13 @@ function buildListFilter(
   params: ListNoteTargetsParams
 ): Record<string, unknown> | null {
   const { noteId, personId, companyId, opportunityId } = params;
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = toTargetFilter({
+    personId,
+    companyId,
+    opportunityId,
+  });
 
   if (noteId) filter.noteId = { eq: noteId };
-  if (personId) filter.personId = { eq: personId };
-  if (companyId) filter.companyId = { eq: companyId };
-  if (opportunityId) filter.opportunityId = { eq: opportunityId };
 
   return Object.keys(filter).length > 0 ? filter : null;
 }
@@ -67,12 +68,11 @@ export async function createNoteTarget(
 
   const input = transformCreateInput(data);
 
-  const result = await client.request<{ createNoteTarget: NoteTarget }>(
-    CREATE_NOTE_TARGET_MUTATION,
-    { input }
-  );
+  const result = await client.request<{
+    createNoteTarget: Record<string, unknown>;
+  }>(CREATE_NOTE_TARGET_MUTATION, { input });
 
-  const noteTarget = result.createNoteTarget;
+  const noteTarget = fromTargetFields(result.createNoteTarget) as unknown as NoteTarget;
 
   // Determine what was linked
   const targetType = noteTarget.personId
@@ -106,11 +106,13 @@ export async function listNoteTargets(
   const filter = buildListFilter(filterParams);
 
   const result = await client.request<{
-    noteTargets: Connection<NoteTarget>;
+    noteTargets: Connection<Record<string, unknown>>;
   }>(LIST_NOTE_TARGETS_QUERY, { filter, limit });
 
   const connection = result.noteTargets;
-  const noteTargets = connection.edges.map((edge) => edge.node);
+  const noteTargets = connection.edges.map(
+    (edge) => fromTargetFields(edge.node) as unknown as NoteTarget
+  );
   const summary = `Found ${noteTargets.length} note target(s)${
     connection.pageInfo.hasNextPage ? " (more available)" : ""
   }`;

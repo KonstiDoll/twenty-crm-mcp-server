@@ -6,6 +6,11 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { GraphQLClient } from "../../shared/graphql-client.js";
 import { Connection } from "../../shared/types.js";
 import {
+  fromTargetFields,
+  toTargetFields,
+  toTargetFilter,
+} from "../../shared/targets.js";
+import {
   CREATE_TASK_TARGET_MUTATION,
   LIST_TASK_TARGETS_QUERY,
   DELETE_TASK_TARGET_MUTATION,
@@ -23,15 +28,10 @@ import {
 function transformCreateInput(
   data: CreateTaskTargetInput
 ): TaskTargetGraphQLInput {
-  const input: TaskTargetGraphQLInput = {
+  return {
     taskId: data.taskId,
+    ...toTargetFields(data),
   };
-
-  if (data.personId) input.personId = data.personId;
-  if (data.companyId) input.companyId = data.companyId;
-  if (data.opportunityId) input.opportunityId = data.opportunityId;
-
-  return input;
 }
 
 /**
@@ -41,12 +41,13 @@ function buildListFilter(
   params: ListTaskTargetsParams
 ): Record<string, unknown> | null {
   const { taskId, personId, companyId, opportunityId } = params;
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = toTargetFilter({
+    personId,
+    companyId,
+    opportunityId,
+  });
 
   if (taskId) filter.taskId = { eq: taskId };
-  if (personId) filter.personId = { eq: personId };
-  if (companyId) filter.companyId = { eq: companyId };
-  if (opportunityId) filter.opportunityId = { eq: opportunityId };
 
   return Object.keys(filter).length > 0 ? filter : null;
 }
@@ -67,12 +68,11 @@ export async function createTaskTarget(
 
   const input = transformCreateInput(data);
 
-  const result = await client.request<{ createTaskTarget: TaskTarget }>(
-    CREATE_TASK_TARGET_MUTATION,
-    { input }
-  );
+  const result = await client.request<{
+    createTaskTarget: Record<string, unknown>;
+  }>(CREATE_TASK_TARGET_MUTATION, { input });
 
-  const taskTarget = result.createTaskTarget;
+  const taskTarget = fromTargetFields(result.createTaskTarget) as unknown as TaskTarget;
 
   // Determine what was linked
   const targetType = taskTarget.personId
@@ -106,11 +106,13 @@ export async function listTaskTargets(
   const filter = buildListFilter(filterParams);
 
   const result = await client.request<{
-    taskTargets: Connection<TaskTarget>;
+    taskTargets: Connection<Record<string, unknown>>;
   }>(LIST_TASK_TARGETS_QUERY, { filter, limit });
 
   const connection = result.taskTargets;
-  const taskTargets = connection.edges.map((edge) => edge.node);
+  const taskTargets = connection.edges.map(
+    (edge) => fromTargetFields(edge.node) as unknown as TaskTarget
+  );
   const summary = `Found ${taskTargets.length} task target(s)${
     connection.pageInfo.hasNextPage ? " (more available)" : ""
   }`;

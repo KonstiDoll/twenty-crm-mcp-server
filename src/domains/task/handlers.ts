@@ -7,6 +7,7 @@ import { createCRUDHandlers } from "../../shared/base-handler.js";
 import { GraphQLClient } from "../../shared/graphql-client.js";
 import { transformBodyV2 } from "../../shared/transformers.js";
 import { CREATE_TASK_TARGET_MUTATION } from "../taskTarget/queries.js";
+import { toTargetFields } from "../../shared/targets.js";
 import {
   CREATE_TASK_MUTATION,
   GET_TASK_QUERY,
@@ -129,7 +130,9 @@ export async function createTask(
 
       const linked: string[] = [];
       for (const target of targets) {
-        await client.request(CREATE_TASK_TARGET_MUTATION, { input: target });
+        await client.request(CREATE_TASK_TARGET_MUTATION, {
+          input: { taskId: target.taskId, ...toTargetFields(target) },
+        });
         if (target.personId) linked.push(`person (${target.personId})`);
         if (target.companyId) linked.push(`company (${target.companyId})`);
         if (target.opportunityId) linked.push(`opportunity (${target.opportunityId})`);
